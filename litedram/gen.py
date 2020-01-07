@@ -32,6 +32,8 @@ from migen.genlib.resetsync import AsyncResetSynchronizer
 from litex.build.generic_platform import *
 from litex.build.xilinx import XilinxPlatform
 
+from litex.boards.platforms import genesys2
+
 from litex.soc.cores.clock import *
 from litex.soc.integration.soc_sdram import *
 from litex.soc.integration.builder import *
@@ -52,14 +54,14 @@ from litedram.frontend.bist import LiteDRAMBISTChecker
 def get_common_ios():
     return [
         # clk / rst
-        ("clk", 0, Pins(1)),
-        ("rst", 0, Pins(1)),
+        # ("clk", 0, Pins(1)),
+        # ("rst", 0, Pins(1)),
 
         # serial
-        ("serial", 0,
-            Subsignal("tx", Pins(1)),
-            Subsignal("rx", Pins(1))
-        ),
+        # ("serial", 0,
+        #     Subsignal("tx", Pins(1)),
+        #     Subsignal("rx", Pins(1))
+        # ),
 
         # crg status
         ("pll_locked", 0, Pins(1)),
@@ -210,11 +212,11 @@ class LiteDRAMCRG(Module):
 
         # # #
 
-        clk = platform.request("clk")
-        rst = platform.request("rst")
+        clk = platform.request("clk200")
+        rst_n = platform.request("cpu_reset_n")
 
         self.submodules.sys_pll = sys_pll = S7PLL(speedgrade=core_config["speedgrade"])
-        self.comb += sys_pll.reset.eq(rst)
+        self.comb += sys_pll.reset.eq(~rst_n)
         sys_pll.register_clkin(clk, core_config["input_clk_freq"])
         sys_pll.create_clkout(self.cd_sys, core_config["sys_clk_freq"])
         if core_config["memtype"] == "DDR3":
@@ -226,7 +228,7 @@ class LiteDRAMCRG(Module):
         self.comb += platform.request("pll_locked").eq(sys_pll.locked)
 
         self.submodules.iodelay_pll = iodelay_pll = S7PLL()
-        self.comb += iodelay_pll.reset.eq(rst)
+        self.comb += iodelay_pll.reset.eq(~rst_n)
         iodelay_pll.register_clkin(clk, core_config["input_clk_freq"])
         iodelay_pll.create_clkout(self.cd_iodelay, core_config["iodelay_clk_freq"])
         self.submodules.idelayctrl = S7IDELAYCTRL(self.cd_iodelay)
@@ -257,7 +259,7 @@ class LiteDRAMCore(SoCSDRAM):
         self.submodules.crg = LiteDRAMCRG(platform, core_config)
 
         # sdram
-        platform.add_extension(get_dram_ios(core_config))
+        # platform.add_extension(get_dram_ios(core_config))
         assert core_config["memtype"] in ["DDR2", "DDR3"]
         self.submodules.ddrphy = core_config["sdram_phy"](
             platform.request("ddram"),
@@ -430,7 +432,7 @@ def main():
             core_config[k] = getattr(litedram_phys, core_config[k])
 
     # Generate core
-    platform = Platform()
+    platform = genesys2.Platform()
     soc = LiteDRAMCore(platform, core_config, integrated_rom_size=0x6000)
     builder = Builder(soc, output_dir="build", compile_gateware=False)
     vns = builder.build(build_name="litedram_core", regular_comb=False)
