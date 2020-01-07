@@ -17,6 +17,7 @@ cmds = {
 }
 
 # SDR ----------------------------------------------------------------------------------------------
+
 def get_sdr_phy_init_sequence(phy_settings, timing_settings):
     cl = phy_settings.cl
     bl = 1
@@ -36,6 +37,7 @@ def get_sdr_phy_init_sequence(phy_settings, timing_settings):
     return init_sequence, None
 
 # DDR ----------------------------------------------------------------------------------------------
+
 def get_ddr_phy_init_sequence(phy_settings, timing_settings):
     cl = phy_settings.cl
     bl = 4
@@ -57,6 +59,7 @@ def get_ddr_phy_init_sequence(phy_settings, timing_settings):
     return init_sequence, None
 
 # LPDDR --------------------------------------------------------------------------------------------
+
 def get_lpddr_phy_init_sequence(phy_settings, timing_settings):
     cl = phy_settings.cl
     bl = 4
@@ -75,9 +78,10 @@ def get_lpddr_phy_init_sequence(phy_settings, timing_settings):
         ("Load Mode Register / CL={0:d}, BL={1:d}".format(cl, bl), mr, 0, cmds["MODE_REGISTER"], 200)
     ]
 
-    return init_sequence, mr1
+    return init_sequence, None
 
 # DDR2 ---------------------------------------------------------------------------------------------
+
 def get_ddr2_phy_init_sequence(phy_settings, timing_settings):
     cl = phy_settings.cl
     bl = 4
@@ -107,6 +111,7 @@ def get_ddr2_phy_init_sequence(phy_settings, timing_settings):
     return init_sequence, None
 
 # DDR3 ---------------------------------------------------------------------------------------------
+
 def get_ddr3_phy_init_sequence(phy_settings, timing_settings):
     cl = phy_settings.cl
     bl = 8
@@ -211,6 +216,7 @@ def get_ddr3_phy_init_sequence(phy_settings, timing_settings):
     return init_sequence, mr1
 
 # DDR4 ---------------------------------------------------------------------------------------------
+
 def get_ddr4_phy_init_sequence(phy_settings, timing_settings):
     cl = phy_settings.cl
     bl = 8
@@ -292,6 +298,15 @@ def get_ddr4_phy_init_sequence(phy_settings, timing_settings):
         mr2 |= rtt_wr << 9
         return mr2
 
+    def format_mr3(fine_refresh_mode):
+        fine_refresh_mode_to_mr3 = {
+            "1x": 0b000,
+            "2x": 0b001,
+            "4x": 0b010
+        }
+        mr3 = fine_refresh_mode_to_mr3[fine_refresh_mode] << 6
+        return mr3
+
     def format_mr6(tccd):
         tccd_to_mr6 = {
             4: 0b000,
@@ -344,7 +359,7 @@ def get_ddr4_phy_init_sequence(phy_settings, timing_settings):
     mr0 = format_mr0(bl, cl, wr, 1)
     mr1 = format_mr1(1, z_to_ron[ron], z_to_rtt_nom[rtt_nom])
     mr2 = format_mr2(cwl, z_to_rtt_wr[rtt_wr])
-    mr3 = 0
+    mr3 = format_mr3(timing_settings.fine_refresh_mode)
     mr4 = 0
     mr5 = 0
     mr6 = format_mr6(4) # FIXME: tCCD
@@ -416,19 +431,19 @@ __attribute__((unused)) static void command_p{n}(int cmd)
     for n in range(nphases):
         sdram_dfii_pix_wrdata_addr.append("CSR_SDRAM_DFII_PI{n}_WRDATA_ADDR".format(n=n))
     r += """
-const unsigned long sdram_dfii_pix_wrdata_addr[{n}] = {{
-    {sdram_dfii_pix_wrdata_addr}
+const unsigned long sdram_dfii_pix_wrdata_addr[DFII_NPHASES] = {{
+\t{sdram_dfii_pix_wrdata_addr}
 }};
-""".format(n=nphases, sdram_dfii_pix_wrdata_addr=",\n\t".join(sdram_dfii_pix_wrdata_addr))
+""".format(sdram_dfii_pix_wrdata_addr=",\n\t".join(sdram_dfii_pix_wrdata_addr))
 
     sdram_dfii_pix_rddata_addr = []
     for n in range(nphases):
         sdram_dfii_pix_rddata_addr.append("CSR_SDRAM_DFII_PI{n}_RDDATA_ADDR".format(n=n))
     r += """
-const unsigned long sdram_dfii_pix_rddata_addr[{n}] = {{
-    {sdram_dfii_pix_rddata_addr}
+const unsigned long sdram_dfii_pix_rddata_addr[DFII_NPHASES] = {{
+\t{sdram_dfii_pix_rddata_addr}
 }};
-""".format(n=nphases, sdram_dfii_pix_rddata_addr=",\n\t".join(sdram_dfii_pix_rddata_addr))
+""".format(sdram_dfii_pix_rddata_addr=",\n\t".join(sdram_dfii_pix_rddata_addr))
     r += "\n"
 
     init_sequence, mr1 = get_sdram_phy_init_sequence(phy_settings, timing_settings)
