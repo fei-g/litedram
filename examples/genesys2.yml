@@ -5,7 +5,7 @@
     # General ------------------------------------------------------------------
     "cpu":        "vexriscv", # Type of CPU used for init/calib (vexriscv, lm32)
     "speedgrade": -2,         # FPGA speedgrade
-    "memtype":    "DDR3",      # DRAM type
+    "memtype":    "DDR3",     # DRAM type
 
     # PHY ----------------------------------------------------------------------
     "cmd_delay":       0,             # Command additional delay (in taps)
@@ -29,9 +29,11 @@
     "cmd_buffer_depth": 16,    # Depth of the command buffer
 
     # User Ports ---------------------------------------------------------------
-    "user_ports_nb":       1,     # Number of user ports
-    "user_ports_type":     "native", # Type of ports (axi, wishbone, native)
-    # "user_ports_id_width": 6,    # AXI identifier width
+    "user_ports": {
+        "native_0" : {
+            "type": "native",
+        },
+    },
 
     # CSR Port -----------------------------------------------------------------
     "csr_expose": "False", # Expose CSR bus as I/Os
