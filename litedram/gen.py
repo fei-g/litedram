@@ -29,10 +29,13 @@ import argparse
 from migen import *
 from migen.genlib.resetsync import AsyncResetSynchronizer
 
+from migen.fhdl import verilog
+
 from litex.build.generic_platform import *
 from litex.build.xilinx import XilinxPlatform
 
 from litex.boards.platforms import genesys2
+from litex.boards.platforms import vc707
 
 from litex.soc.cores.clock import *
 from litex.soc.integration.soc_sdram import *
@@ -213,10 +216,11 @@ class LiteDRAMCRG(Module):
         # # #
 
         clk = platform.request("clk200")
-        rst_n = platform.request("cpu_reset_n")
+        rst = platform.request("cpu_reset")
+        # rst_n = platform.request("cpu_reset_n")  # For Genesys2
 
         self.submodules.sys_pll = sys_pll = S7PLL(speedgrade=core_config["speedgrade"])
-        self.comb += sys_pll.reset.eq(~rst_n)
+        self.comb += sys_pll.reset.eq(rst)
         sys_pll.register_clkin(clk, core_config["input_clk_freq"])
         sys_pll.create_clkout(self.cd_sys, core_config["sys_clk_freq"])
         if core_config["memtype"] == "DDR3":
@@ -228,7 +232,7 @@ class LiteDRAMCRG(Module):
         self.comb += platform.request("pll_locked").eq(sys_pll.locked)
 
         self.submodules.iodelay_pll = iodelay_pll = S7PLL()
-        self.comb += iodelay_pll.reset.eq(~rst_n)
+        self.comb += iodelay_pll.reset.eq(rst)
         iodelay_pll.register_clkin(clk, core_config["input_clk_freq"])
         iodelay_pll.create_clkout(self.cd_iodelay, core_config["iodelay_clk_freq"])
         self.submodules.idelayctrl = S7IDELAYCTRL(self.cd_iodelay)
@@ -270,6 +274,7 @@ class LiteDRAMCore(SoCSDRAM):
         # SoCSDRAM ---------------------------------------------------------------------------------
         SoCSDRAM.__init__(self, platform, sys_clk_freq,
             cpu_type=cpu_type,
+            #cpu_variant="lite",
             csr_alignment=csr_align,
             **kwargs)
 
@@ -296,10 +301,20 @@ class LiteDRAMCore(SoCSDRAM):
             "1:4" if core_config["memtype"] == "DDR3" else "1:2")
         controller_settings = controller_settings=ControllerSettings(
             cmd_buffer_depth=core_config["cmd_buffer_depth"])
+
+        #print("Before register, submodules are")
+        #print(self._submodules)
+
         self.register_sdram(self.ddrphy,
                             sdram_module.geom_settings,
                             sdram_module.timing_settings,
                             controller_settings=controller_settings)
+
+
+        #feig Print out the PHY submodule
+        # verilog.convert(self.ddrphy).write("DDRPHY.v")        
+        #print("After register, submodules are")
+        #print(self._submodules)
 
         # DRAM Initialization ----------------------------------------------------------------------
         self.submodules.ddrctrl = LiteDRAMCoreControl()
@@ -307,6 +322,11 @@ class LiteDRAMCore(SoCSDRAM):
             platform.request("init_done").eq(self.ddrctrl.init_done.storage),
             platform.request("init_error").eq(self.ddrctrl.init_error.storage)
         ]
+
+        #print("Before setting up controller, submodules are")
+        #print(self._submodules)
+
+        print("Crossbar has {} master ports".format(len(self.sdram.crossbar.masters)))
 
         # CSR port ---------------------------------------------------------------------------------
         if csr_expose:
@@ -436,7 +456,8 @@ class LiteDRAMCore(SoCSDRAM):
                 ]
         else:
             raise ValueError("Unsupported port type: {}".format(core_config["user_ports_type"]))
-
+        
+        print("Crossbar has {} master ports".format(len(self.sdram.crossbar.masters)))
 # Build --------------------------------------------------------------------------------------------
 
 def main():
@@ -459,7 +480,7 @@ def main():
             core_config[k] = getattr(litedram_phys, core_config[k])
 
     # Generate core --------------------------------------------------------------------------------
-    platform = genesys2.Platform()
+    platform = vc707.Platform()
     soc      = LiteDRAMCore(platform, core_config, integrated_rom_size=0x6000)
     builder  = Builder(soc, output_dir="build", compile_gateware=False)
     vns      = builder.build(build_name="litedram_core", regular_comb=False)
