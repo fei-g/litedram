@@ -87,13 +87,49 @@ module test();
         k7ddrphy_dfi_p1_cas_n = 0;
         k7ddrphy_dfi_p2_ras_n = 0;
         k7ddrphy_dfi_p3_cke = 1;
+        k7ddrphy_dfi_p0_address = 15'h1111; 
+        k7ddrphy_dfi_p1_address = 15'h2222; 
+        k7ddrphy_dfi_p2_address = 15'h3333; 
+        k7ddrphy_dfi_p3_address = 15'h4444; 
 
         #16
         k7ddrphy_dfi_p0_we_n = 1;
         k7ddrphy_dfi_p1_cas_n = 1;
         k7ddrphy_dfi_p2_ras_n = 1;
+        k7ddrphy_dfi_p2_cas_n = 0;
         k7ddrphy_dfi_p3_cke = 0;
+        k7ddrphy_dfi_p0_address = 15'h5555; 
+        k7ddrphy_dfi_p1_address = 15'h6666; 
+        k7ddrphy_dfi_p2_address = 15'h7777; 
+        k7ddrphy_dfi_p3_address = 15'h8888; 
+        k7ddrphy_dfi_p3_wrdata_en = 1'd1;
+        k7ddrphy_dfi_p3_wrdata_mask = 8'hff;
 
+        #16
+        k7ddrphy_dfi_p2_cas_n = 1;
+        k7ddrphy_dfi_p3_wrdata_en = 1'd0;
+        k7ddrphy_dfi_p0_wrdata = 64'hb0b0_b1b1_b2b2_b3b3;
+        k7ddrphy_dfi_p1_wrdata = 64'ha0a0_a1a1_a2a2_a3a3;
+        k7ddrphy_dfi_p2_wrdata = 64'h9090_9191_9292_9393;
+        k7ddrphy_dfi_p3_wrdata = 64'h8080_8181_8282_8383;
+
+        #16
+        k7ddrphy_dfi_p0_wrdata = 64'hf0f0_f1f1_f2f2_f3f3;
+        k7ddrphy_dfi_p1_wrdata = 64'he0e0_e1e1_e2e2_e3e3;
+        k7ddrphy_dfi_p2_wrdata = 64'hd0d0_d1d1_d2d2_d3d3;
+        k7ddrphy_dfi_p3_wrdata = 64'hc0c0_c1c1_c2c2_c3c3;
+        
+        #16
+        k7ddrphy_dfi_p0_wrdata = 64'h7070_7171_7272_7373;
+        k7ddrphy_dfi_p1_wrdata = 64'h6060_6161_6262_6363;
+        k7ddrphy_dfi_p2_wrdata = 64'h5050_5151_5252_5353;
+        k7ddrphy_dfi_p3_wrdata = 64'h4040_4141_4242_4343;
+        
+        #16
+        k7ddrphy_dfi_p0_wrdata = 64'h0;
+        k7ddrphy_dfi_p1_wrdata = 64'h0;
+        k7ddrphy_dfi_p2_wrdata = 64'h0;
+        k7ddrphy_dfi_p3_wrdata = 64'h0;
     end
 
     wire [14:0] ddram_a;
