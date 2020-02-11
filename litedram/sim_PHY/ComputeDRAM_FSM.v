@@ -2,7 +2,7 @@
 
 module FSM_test();
     reg vld;
-    wire rdy;
+    wire rdy, cmd_valid;
     reg [`DDR_ADDR_WIDTH-1:0]    R1;
     reg [`DDR_ADDR_WIDTH-1:0]    R2;
     reg [3:0]     T1;
@@ -113,6 +113,8 @@ module FSM_test();
         .R2     (R2),
         .T1     (T1),
         .T2     (T2),
+
+        .cmd_valid  (cmd_valid),
 
         .k7ddrphy_dfi_p0_address           (k7ddrphy_dfi_p0_address     ),
         .k7ddrphy_dfi_p0_bank              (k7ddrphy_dfi_p0_bank        ),
@@ -274,6 +276,8 @@ module ComputeDRAM_FSM(
     input   vld,
     output  rdy,
 
+    output  cmd_valid,
+
     // TODO Currently R1 and R2 are row addresses. Bank address fixed to 0.
     // change to use physical address? and translate that into bank-row inside
     // the fsm?
@@ -416,6 +420,7 @@ module ComputeDRAM_FSM(
 
     wire [3:0] debug_probe = instr[(index+3)*4+:4];
     assign rdy = (state == IDLE);
+    assign cmd_valid = (state == ISSUE);
 
     always @(posedge clk) begin
         if (rst) begin

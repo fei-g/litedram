@@ -22,16 +22,18 @@
 
     # Frequency ----------------------------------------------------------------
     "input_clk_freq":   200e6, # Input clock frequency
-    "sys_clk_freq":     200e6, # System clock frequency (DDR_clk = 4 x sys_clk)
+    "sys_clk_freq":     125e6, # System clock frequency (DDR_clk = 4 x sys_clk)
     "iodelay_clk_freq": 200e6, # IODELAYs reference clock frequency
 
     # Core ---------------------------------------------------------------------
     "cmd_buffer_depth": 16,    # Depth of the command buffer
 
     # User Ports ---------------------------------------------------------------
-    "user_ports_nb":       1,     # Number of user ports
-    "user_ports_type":     "native", # Type of ports (axi, wishbone, native)
-    #"user_ports_id_width": 6,    # AXI identifier width
+    "user_ports": {
+        "native_0" : {
+            "type": "native",
+        },
+    },
 
     # CSR Port -----------------------------------------------------------------
     "csr_expose": "False", # Expose CSR bus as I/Os

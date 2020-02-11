@@ -80,6 +80,14 @@ def get_common_ios():
         ("init_done",  0, Pins(1)),
         ("init_error", 0, Pins(1)),
 
+        # ComputeDRAM interface
+        ("ComputeDRAM_R1",  0, Pins(10)),
+        ("ComputeDRAM_R2",  0, Pins(10)),
+        ("ComputeDRAM_T1",  0, Pins(4)),
+        ("ComputeDRAM_T2",  0, Pins(4)),
+        ("ComputeDRAM_vld",  0, Pins(1)),
+        ("ComputeDRAM_rdy",  0, Pins(1)),
+
         # iodelay clk / rst
         ("clk_iodelay", 0, Pins(1)),
         ("rst_iodelay", 0, Pins(1)),
@@ -87,6 +95,7 @@ def get_common_ios():
         # user clk / rst
         ("user_clk", 0, Pins(1)),
         ("user_rst", 0, Pins(1))
+
     ]
 
 def get_dram_ios(core_config):
@@ -565,6 +574,19 @@ class LiteDRAMCore(SoCSDRAM):
                 raise ValueError("Unsupported port type: {}".format(port["type"]))
         
             print("Crossbar has {} master ports".format(len(self.sdram.crossbar.masters)))
+        
+        ## ComputeDRAM ports
+        # print (self._submodules)
+        self.comb += [
+            self.sdram.R1.eq(platform.request("ComputeDRAM_R1")),
+            self.sdram.R2.eq(platform.request("ComputeDRAM_R2")),
+            self.sdram.T1.eq(platform.request("ComputeDRAM_T1")),
+            self.sdram.T2.eq(platform.request("ComputeDRAM_T2")),
+            self.sdram.vld.eq(platform.request("ComputeDRAM_vld")),
+            platform.request("ComputeDRAM_rdy").eq(self.sdram.rdy)
+        ]
+
+
 
 # Build --------------------------------------------------------------------------------------------
 
