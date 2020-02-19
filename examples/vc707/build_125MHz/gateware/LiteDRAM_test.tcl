@@ -1,6 +1,6 @@
 create_project -force -name LiteDRAM_test -part xc7vx485tffg1761-2
 set_msg_config -id {Common 17-55} -new_severity {Warning}
-add_files {/tigress/feig/litex/litex/litex/soc/cores/cpu/vexriscv/verilog/VexRiscv.v}
+add_files {VexRiscv.v}
 add_files {LiteDRAM_test.v}
 add_files {litedram_core.v}
 read_xdc LiteDRAM_test.xdc

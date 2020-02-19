@@ -29,10 +29,10 @@ class LiteDRAMCore(Module, AutoCSR):
         self.submodules.crossbar = LiteDRAMCrossbar(controller.interface)
 
         # Instantiate ComputeDRAM sequence generator 
-        self.R1 = Signal()
-        self.R2 = Signal()
-        self.T1 = Signal()
-        self.T2 = Signal()
+        self.R1 = Signal(geom_settings.addressbits)
+        self.R2 = Signal(geom_settings.addressbits)
+        self.T1 = Signal(4)
+        self.T2 = Signal(4)
         self.vld = Signal()
         self.rdy = Signal()
         self.specials.seqgen = Instance( "ComputeDRAM_FSM",

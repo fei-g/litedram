@@ -52,7 +52,8 @@ class DFIInjector(Module, AutoCSR):
         # interface for ComputeDRAM to issue command sequence
         self.cmds   = dfi.Interface(addressbits, bankbits, nranks, databits, nphases)
         self.cmd_valid = Signal()
-        print("Hi I'm Here")
+        # print("Hi I'm Here")
+        
         self._control = CSRStorage(4)  # sel, cke, odt, reset_n
 
         for n, phase in enumerate(inti.phases):
@@ -60,13 +61,18 @@ class DFIInjector(Module, AutoCSR):
 
         # # #
 
-        self.comb += If(self._control.storage[0],
-                self.slave.connect(self.master)
+        self.comb += If(~self._control.storage[0],
+                inti.connect(self.master)
             ).Elif(self.cmd_valid,
                 self.cmds.connect(self.master)
             ).Else(
-                inti.connect(self.master)
+                self.slave.connect(self.master)
             )
+        '''self.comb += If(self.cmd_valid,
+                self.cmds.connect(self.master)
+            ).Else(
+                self.slave.connect(self.master)
+            )'''
         for i in range(nranks):
             self.comb += [phase.cke[i].eq(self._control.storage[1]) for phase in inti.phases]
             self.comb += [phase.odt[i].eq(self._control.storage[2]) for phase in inti.phases if hasattr(phase, "odt")]

@@ -24,7 +24,7 @@ module litedram_core_testbench();
     wire serial_tx;
     reg  serial_rx = 0;
 
-    wire [14:0] ddram_a;
+    wire [15:0] ddram_a;
     wire [2:0] ddram_ba;
     wire ddram_ras_n;
     wire ddram_cas_n;
@@ -44,10 +44,12 @@ module litedram_core_testbench();
     wire user_port_native_0_cmd_ready           ;
     reg user_port_native_0_cmd_we               = 0;
     reg [23:0] user_port_native_0_cmd_addr      = 0;
+    reg [23:0] write_addr      = 0;
     reg user_port_native_0_wdata_valid          = 0;
     wire user_port_native_0_wdata_ready         ;
     reg [31:0] user_port_native_0_wdata_we      = 0;
     reg [255:0] user_port_native_0_wdata_data   = 0;
+    reg [255:0] write_data   = 0;
     wire user_port_native_0_rdata_valid         ;
     reg user_port_native_0_rdata_ready          = 0;
     wire [255:0] user_port_native_0_rdata_data  ;
@@ -56,12 +58,17 @@ module litedram_core_testbench();
     wire    init_done;
     wire    init_error;
 
-    reg [9:0] ComputeDRAM_R1;
-    reg [9:0] ComputeDRAM_R2;
+    wire    user_clk;
+    wire    user_rst;
+
+    reg [15:0] ComputeDRAM_R1;
+    reg [15:0] ComputeDRAM_R2;
     reg [3:0] ComputeDRAM_T1;
     reg [3:0] ComputeDRAM_T2;
     reg ComputeDRAM_vld;
     wire ComputeDRAM_rdy;
+
+    reg start_write = 0;
 
     initial begin
         ComputeDRAM_R1  = 0;
@@ -70,19 +77,108 @@ module litedram_core_testbench();
         ComputeDRAM_T2  = 0;
         ComputeDRAM_vld = 0;
 
-        #101
+        #1001
         ComputeDRAM_R1  = 4;
         ComputeDRAM_R2  = 5;
         ComputeDRAM_T1  = 2;
         ComputeDRAM_T2  = 2;
         ComputeDRAM_vld = 1;
 
-        #10
+        #19
         ComputeDRAM_R1  = 0;
         ComputeDRAM_R2  = 0;
         ComputeDRAM_T1  = 0;
         ComputeDRAM_T2  = 0;
         ComputeDRAM_vld = 0;
+
+        #16
+        start_write = 1;
+        write_addr = 24'h 00_0000;
+        write_data = 256'h 1111_2222_3333_4444_5555_6666_7777_8888_9999_aaaa_bbbb_cccc_dddd_eeee_ffff_0000;
+
+        #16
+        start_write = 0;
+        
+        #640
+        start_write = 1;
+        write_addr = 24'h 00_0008;
+        write_data = 256'h 1111_2222_3333_4444_5555_6666_7777_8888_9999_aaaa_bbbb_cccc_dddd_eeee_ffff_0101;
+
+        #16
+        start_write = 0;
+        
+        #640
+        start_write = 1;
+        write_addr = 24'h 00_00f0;
+        write_data = 256'h 1111_2222_3333_4444_5555_6666_7777_8888_9999_aaaa_bbbb_cccc_dddd_eeee_ffff_1212;
+
+        #16
+        start_write = 0;
+        
+        #640
+        start_write = 1;
+        write_addr = 24'h 00_0781;
+        write_data = 256'h 1111_2222_3333_4444_5555_6666_7777_8888_9999_aaaa_bbbb_cccc_dddd_eeee_ffff_2323;
+
+        #16
+        start_write = 0;
+        
+        #640
+        start_write = 1;
+        write_addr = 24'h 00_0701;
+        write_data = 256'h 1111_2222_3333_4444_5555_6666_7777_8888_9999_aaaa_bbbb_cccc_dddd_eeee_ffff_3434;
+
+        #16
+        start_write = 0;
+    end
+
+    reg [1:0] state;
+    localparam IDLE = 0;
+    localparam WRITE = 1;
+    localparam WAIT = 2;
+    always @(posedge user_clk) begin
+        if (user_rst) begin
+            state = IDLE;
+        end
+        else if (start_write && state == IDLE) begin
+            state <= WRITE;
+            user_port_native_0_cmd_addr     <= write_addr;
+            user_port_native_0_wdata_data   <= write_data;
+        end
+        else if (state == WRITE && user_port_native_0_cmd_valid && 
+        user_port_native_0_cmd_ready && user_port_native_0_wdata_valid &&
+        user_port_native_0_wdata_ready) begin
+            state <= IDLE;
+        end
+        else if (state == WRITE && user_port_native_0_cmd_valid && 
+        user_port_native_0_cmd_ready) begin
+            state <= WAIT;
+        end
+        else if (state == WAIT && user_port_native_0_wdata_valid &&
+        user_port_native_0_wdata_ready) begin
+            state <= IDLE;
+        end
+    end
+
+    always @(*) begin
+        if (state == IDLE) begin
+            user_port_native_0_cmd_valid    = 0;
+            user_port_native_0_cmd_we       = 0;
+            user_port_native_0_wdata_valid  = 0;
+            user_port_native_0_wdata_we     = 32'h ffff_ffff; 
+        end
+        else if (state == WRITE) begin
+            user_port_native_0_cmd_valid    = 1;
+            user_port_native_0_cmd_we       = 1;
+            user_port_native_0_wdata_valid  = 1;
+            user_port_native_0_wdata_we     = 32'h ffff_ffff; 
+        end
+        else if (state == WAIT) begin
+            user_port_native_0_cmd_valid    = 0;
+            user_port_native_0_cmd_we       = 1;
+            user_port_native_0_wdata_valid  = 1;
+            user_port_native_0_wdata_we     = 32'h ffff_ffff; 
+        end
     end
     
     litedram_core core(
@@ -123,12 +219,12 @@ module litedram_core_testbench();
 	.user_port_native_0_rdata_ready      (user_port_native_0_rdata_ready ),   
 	.user_port_native_0_rdata_data       (user_port_native_0_rdata_data  ),
 
-	input [9:0] ComputeDRAM_R1,
-	input [9:0] ComputeDRAM_R2,
-	input [3:0] ComputeDRAM_T1,
-	input [3:0] ComputeDRAM_T2,
-	input ComputeDRAM_vld,
-	output ComputeDRAM_rdy
+	.ComputeDRAM_R1                      (ComputeDRAM_R1 ),
+	.ComputeDRAM_R2                      (ComputeDRAM_R2 ),
+	.ComputeDRAM_T1                      (ComputeDRAM_T1 ),
+	.ComputeDRAM_T2                      (ComputeDRAM_T2 ),
+	.ComputeDRAM_vld                     (ComputeDRAM_vld),
+	.ComputeDRAM_rdy                     (ComputeDRAM_rdy)
     );
 
 endmodule

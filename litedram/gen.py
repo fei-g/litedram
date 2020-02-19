@@ -80,9 +80,9 @@ def get_common_ios():
         ("init_done",  0, Pins(1)),
         ("init_error", 0, Pins(1)),
 
-        # ComputeDRAM interface
-        ("ComputeDRAM_R1",  0, Pins(10)),
-        ("ComputeDRAM_R2",  0, Pins(10)),
+        # ComputeDRAM interface TODO need to pass the arg to config the length of R1 R2
+        ("ComputeDRAM_R1",  0, Pins(16)),
+        ("ComputeDRAM_R2",  0, Pins(16)),
         ("ComputeDRAM_T1",  0, Pins(4)),
         ("ComputeDRAM_T2",  0, Pins(4)),
         ("ComputeDRAM_vld",  0, Pins(1)),
