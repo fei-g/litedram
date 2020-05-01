@@ -1,5 +1,5 @@
 # This file is Copyright (c) 2013-2014 Sebastien Bourdeauducq <sb@m-labs.hk>
-# This file is Copyright (c) 2013-2019 Florent Kermarrec <florent@enjoy-digital.fr>
+# This file is Copyright (c) 2013-2020 Florent Kermarrec <florent@enjoy-digital.fr>
 # This file is Copyright (c) 2017 whitequark <whitequark@whitequark.org>
 # This file is Copyright (c) 2014 Yann Sionneau <ys@m-labs.hk>
 # This file is Copyright (c) 2018 bunnie <bunnie@kosagi.com>
@@ -39,9 +39,9 @@ def get_sdr_phy_init_sequence(phy_settings, timing_settings):
 # DDR ----------------------------------------------------------------------------------------------
 
 def get_ddr_phy_init_sequence(phy_settings, timing_settings):
-    cl = phy_settings.cl
-    bl = 4
-    mr = log2_int(bl) + (cl << 4)
+    cl  = phy_settings.cl
+    bl  = 4
+    mr  = log2_int(bl) + (cl << 4)
     emr = 0
     reset_dll = 1 << 8
 
@@ -61,9 +61,9 @@ def get_ddr_phy_init_sequence(phy_settings, timing_settings):
 # LPDDR --------------------------------------------------------------------------------------------
 
 def get_lpddr_phy_init_sequence(phy_settings, timing_settings):
-    cl = phy_settings.cl
-    bl = 4
-    mr = log2_int(bl) + (cl << 4)
+    cl  = phy_settings.cl
+    bl  = 4
+    mr  = log2_int(bl) + (cl << 4)
     emr = 0
     reset_dll = 1 << 8
 
@@ -83,15 +83,15 @@ def get_lpddr_phy_init_sequence(phy_settings, timing_settings):
 # DDR2 ---------------------------------------------------------------------------------------------
 
 def get_ddr2_phy_init_sequence(phy_settings, timing_settings):
-    cl = phy_settings.cl
-    bl = 4
-    wr = 2
-    mr = log2_int(bl) + (cl << 4) + (wr << 9)
-    emr = 0
+    cl   = phy_settings.cl
+    bl   = 4
+    wr   = 2
+    mr   = log2_int(bl) + (cl << 4) + (wr << 9)
+    emr  = 0
     emr2 = 0
     emr3 = 0
+    ocd  = 7 << 7
     reset_dll = 1 << 8
-    ocd = 7 << 7
 
     init_sequence = [
         ("Bring CKE high", 0x0000, 0, cmds["CKE"], 20000),
@@ -113,8 +113,8 @@ def get_ddr2_phy_init_sequence(phy_settings, timing_settings):
 # DDR3 ---------------------------------------------------------------------------------------------
 
 def get_ddr3_phy_init_sequence(phy_settings, timing_settings):
-    cl = phy_settings.cl
-    bl = 8
+    cl  = phy_settings.cl
+    bl  = 8
     cwl = phy_settings.cwl
 
     def format_mr0(bl, cl, wr, dll_reset):
@@ -186,8 +186,8 @@ def get_ddr3_phy_init_sequence(phy_settings, timing_settings):
 
     # default electrical settings (point to point)
     rtt_nom = "60ohm"
-    rtt_wr = "60ohm"
-    ron = "34ohm"
+    rtt_wr  = "60ohm"
+    ron     = "34ohm"
 
     # override electrical settings if specified
     if hasattr(phy_settings, "rtt_nom"):
@@ -197,7 +197,7 @@ def get_ddr3_phy_init_sequence(phy_settings, timing_settings):
     if hasattr(phy_settings, "ron"):
         ron = phy_settings.ron
 
-    wr = max(timing_settings.tWTR*phy_settings.nphases, 5) # >= ceiling(tWR/tCK)
+    wr  = max(timing_settings.tWTR*phy_settings.nphases, 5) # >= ceiling(tWR/tCK)
     mr0 = format_mr0(bl, cl, wr, 1)
     mr1 = format_mr1(z_to_ron[ron], z_to_rtt_nom[rtt_nom])
     mr2 = format_mr2(cwl, z_to_rtt_wr[rtt_wr])
@@ -218,8 +218,8 @@ def get_ddr3_phy_init_sequence(phy_settings, timing_settings):
 # DDR4 ---------------------------------------------------------------------------------------------
 
 def get_ddr4_phy_init_sequence(phy_settings, timing_settings):
-    cl = phy_settings.cl
-    bl = 8
+    cl  = phy_settings.cl
+    bl  = 8
     cwl = phy_settings.cwl
 
     def format_mr0(bl, cl, wr, dll_reset):
@@ -344,8 +344,8 @@ def get_ddr4_phy_init_sequence(phy_settings, timing_settings):
 
     # default electrical settings (point to point)
     rtt_nom = "40ohm"
-    rtt_wr = "120ohm"
-    ron = "34ohm"
+    rtt_wr  = "120ohm"
+    ron     = "34ohm"
 
     # override electrical settings if specified
     if hasattr(phy_settings, "rtt_nom"):
@@ -355,7 +355,7 @@ def get_ddr4_phy_init_sequence(phy_settings, timing_settings):
     if hasattr(phy_settings, "ron"):
         ron = phy_settings.ron
 
-    wr = max(timing_settings.tWTR*phy_settings.nphases, 10) # >= ceiling(tWR/tCK)
+    wr  = max(timing_settings.tWTR*phy_settings.nphases, 10) # >= ceiling(tWR/tCK)
     mr0 = format_mr0(bl, cl, wr, 1)
     mr1 = format_mr1(1, z_to_ron[ron], z_to_rtt_nom[rtt_nom])
     mr2 = format_mr2(cwl, z_to_rtt_wr[rtt_wr])
@@ -397,8 +397,36 @@ def get_sdram_phy_c_header(phy_settings, timing_settings):
     r = "#ifndef __GENERATED_SDRAM_PHY_H\n#define __GENERATED_SDRAM_PHY_H\n"
     r += "#include <hw/common.h>\n#include <generated/csr.h>\n#include <hw/flags.h>\n\n"
 
+    phytype = phy_settings.phytype.upper()
     nphases = phy_settings.nphases
-    r += "#define DFII_NPHASES "+str(nphases)+"\n\n"
+
+    # Define PHY type and number of phases
+    r += "#define SDRAM_PHY_"+phytype+"\n"
+    r += "#define SDRAM_PHY_PHASES "+str(nphases)+"\n"
+
+    # Define Read/Write Leveling capability
+    if phytype in ["USDDRPHY", "USPDDRPHY", "K7DDRPHY", "V7DDRPHY"]:
+        r += "#define SDRAM_PHY_WRITE_LEVELING_CAPABLE\n"
+    if phytype in ["USDDRPHY", "USPDDRPHY"]:
+        r += "#define SDRAM_PHY_WRITE_LEVELING_REINIT\n"
+    if phytype in ["USDDRPHY", "USPDDRPHY", "A7DDRPHY", "K7DDRPHY", "V7DDRPHY", "ECP5DDRPHY"]:
+        r += "#define SDRAM_PHY_READ_LEVELING_CAPABLE\n"
+
+    # Define number of modules/delays/bitslips
+    if phytype in ["USDDRPHY", "USPDDRPHY"]:
+        r += "#define SDRAM_PHY_MODULES DFII_PIX_DATA_BYTES/2\n"
+        r += "#define SDRAM_PHY_DELAYS 512\n"
+        r += "#define SDRAM_PHY_BITSLIPS 8\n"
+    elif phytype in ["A7DDRPHY", "K7DDRPHY", "V7DDRPHY"]:
+        r += "#define SDRAM_PHY_MODULES DFII_PIX_DATA_BYTES/2\n"
+        r += "#define SDRAM_PHY_DELAYS 32\n"
+        r += "#define SDRAM_PHY_BITSLIPS 8\n"
+    elif phytype in ["ECP5DDRPHY"]:
+        r += "#define SDRAM_PHY_MODULES DFII_PIX_DATA_BYTES/4\n"
+        r += "#define SDRAM_PHY_DELAYS 8\n"
+        r += "#define SDRAM_PHY_BITSLIPS 4\n"
+
+    r += "\n"
 
     r += "static void cdelay(int i);\n"
 
@@ -431,7 +459,7 @@ __attribute__((unused)) static void command_p{n}(int cmd)
     for n in range(nphases):
         sdram_dfii_pix_wrdata_addr.append("CSR_SDRAM_DFII_PI{n}_WRDATA_ADDR".format(n=n))
     r += """
-const unsigned long sdram_dfii_pix_wrdata_addr[DFII_NPHASES] = {{
+const unsigned long sdram_dfii_pix_wrdata_addr[SDRAM_PHY_PHASES] = {{
 \t{sdram_dfii_pix_wrdata_addr}
 }};
 """.format(sdram_dfii_pix_wrdata_addr=",\n\t".join(sdram_dfii_pix_wrdata_addr))
@@ -440,7 +468,7 @@ const unsigned long sdram_dfii_pix_wrdata_addr[DFII_NPHASES] = {{
     for n in range(nphases):
         sdram_dfii_pix_rddata_addr.append("CSR_SDRAM_DFII_PI{n}_RDDATA_ADDR".format(n=n))
     r += """
-const unsigned long sdram_dfii_pix_rddata_addr[DFII_NPHASES] = {{
+const unsigned long sdram_dfii_pix_rddata_addr[SDRAM_PHY_PHASES] = {{
 \t{sdram_dfii_pix_rddata_addr}
 }};
 """.format(sdram_dfii_pix_rddata_addr=",\n\t".join(sdram_dfii_pix_rddata_addr))

@@ -32,17 +32,17 @@ module LiteDRAM_test(
     //output        user_clk,              
     //output        user_rst,              
     /*
-    input         user_port0_cmd_valid  
-    output        user_port0_cmd_ready  
-    input         user_port0_cmd_we     
-    input [24:0]  user_port0_cmd_addr   
-    input         user_port0_wdata_valid
-    output        user_port0_wdata_ready
-    input [31:0]  user_port0_wdata_we   
-    input [255:0] user_port0_wdata_data 
-    output        user_port0_rdata_valid
-    input         user_port0_rdata_ready
-    output [255:0]user_port0_rdata_data*/ 
+    input         user_port_native_0_cmd_valid  
+    output        user_port_native_0_cmd_ready  
+    input         user_port_native_0_cmd_we     
+    input [24:0]  user_port_native_0_cmd_addr   
+    input         user_port_native_0_wdata_valid
+    output        user_port_native_0_wdata_ready
+    input [31:0]  user_port_native_0_wdata_we   
+    input [255:0] user_port_native_0_wdata_data 
+    output        user_port_native_0_rdata_valid
+    input         user_port_native_0_rdata_ready
+    output [255:0]user_port_native_0_rdata_data*/ 
 );
 
     // assign serial_rts = 1'b0;
@@ -108,28 +108,67 @@ module LiteDRAM_test(
     wire    init_error;
 
     // assign cmd_addr = 25'h000_0000;
-    assign wdata_data = {240'hffff_eeee_dddd_cccc_bbbb_aaaa_9999_8888_7777_6666_5555_4444_3333_2222_1111, wr_addr[15:0]}; 
+    // assign wdata_data = {240'hffff_eeee_dddd_cccc_bbbb_aaaa_9999_8888_7777_6666_5555_4444_3333_2222_1111, wr_addr[15:0]}; 
+    assign wdata_data = {64{wr_addr[13:10]}}; 
        
     wire always_0 = 1'b0;
     wire always_1 = 1'b1;
 
 
     localparam  IDLE = 0;
-    localparam  READOUT = 2'd1;
-    localparam  WRITE = 2'd2;
+    localparam  READOUT = 3'd1;
+    localparam  WRITE = 3'd2;
+    localparam  SETTING = 3'd3;
+    localparam  ISSUE = 3'd4;
+
     localparam  SENDCMD = 2'd1;
     localparam  READRDY = 2'd2;
+    localparam  WRWAIT = 2'd2;
     localparam  FINISHED = 2'd3;
 
-    reg  [1:0]  state;
+    reg  [2:0]  state;
     reg  [1:0]  read_state;
     reg  [1:0]  write_state;
-    reg  [1:0]  state_next;
+    reg  [1:0]  issue_state;
+    reg  [2:0]  state_next;
     reg  [1:0]  read_state_next;
     reg  [1:0]  write_state_next;
+    reg  [1:0]  issue_state_next;
     wire [1:0]  counter_state;
     reg  [3:0]  read_out_data;
     reg  [255:0] rdata_buf;
+    
+    wire [15:0] ComputeDRAM_R1 = 16'h 1;
+    wire [15:0] ComputeDRAM_R2 = 16'h 2;
+    reg [3:0] ComputeDRAM_T1;
+    reg [3:0] ComputeDRAM_T2;
+    wire ComputeDRAM_vld = (issue_state == SENDCMD);
+    wire ComputeDRAM_rdy;
+    reg [1:0] TimeInterval_botton; // Use to distinguish the state of holding the botton with releasing the botton
+    always @(posedge user_clk) begin
+        if (user_rst) begin
+            TimeInterval_botton <= 2'd0;
+            ComputeDRAM_T1 <= 0;
+            ComputeDRAM_T2 <= 0;
+        end
+        else if (state == IDLE) begin
+            TimeInterval_botton <= 0;
+        end
+        else if (state == SETTING && start_read_db && TimeInterval_botton == 0) begin 
+            TimeInterval_botton <= 2'd1;
+        end
+        else if (state == SETTING && start_write_db && TimeInterval_botton == 0) begin 
+            TimeInterval_botton <= 2'd2;
+        end
+        else if (state == SETTING && ~start_read_db && TimeInterval_botton == 2'd1) begin 
+            TimeInterval_botton <= 2'd0;
+            ComputeDRAM_T1 <= ComputeDRAM_T1 + 1;
+        end
+        else if (state == SETTING && ~start_write_db && TimeInterval_botton == 2'd2) begin 
+            TimeInterval_botton <= 2'd0;
+            ComputeDRAM_T2 <= ComputeDRAM_T2 + 1;
+        end
+    end
 
     reg [1:0] addr_botton; // Use to distinguish the state of holding the botton with releasing the botton
     always @(posedge user_clk) begin
@@ -149,7 +188,7 @@ module LiteDRAM_test(
         end
         else if (state == READOUT && start_read_db && addr_botton == 2'd2) begin 
             addr_botton <= 2'd1;
-            rd_addr <= (rd_addr + 1) & 8'h07;
+            rd_addr <= (rd_addr + 24'h 00_0400) & 24'h00_0fff;
         end
 
         else if (state == WRITE && start_write_db && addr_botton == 0) begin
@@ -160,7 +199,7 @@ module LiteDRAM_test(
         end
         else if (state == WRITE && start_write_db && addr_botton == 2'd2) begin
             addr_botton <= 2'd1;
-            wr_addr <= (wr_addr + 1) & 8'h07;
+            wr_addr <= (wr_addr + 24'h 00_0400) & 24'h00_0fff;
         end
     end
 
@@ -170,6 +209,12 @@ module LiteDRAM_test(
         end
         else if (state == IDLE && start_write_db) begin
             state_next = WRITE;
+        end
+        else if (state == IDLE && next_db) begin
+            state_next = SETTING;
+        end
+        else if (state == SETTING && prev_db) begin
+            state_next = ISSUE;
         end
         else if (home_db) begin
             state_next = IDLE;
@@ -203,8 +248,27 @@ module LiteDRAM_test(
         else if (write_state == SENDCMD && wdata_valid && wdata_ready && cmd_valid && cmd_ready && cmd_we) begin
             write_state_next = FINISHED;
         end
+        else if (write_state == SENDCMD && cmd_valid && cmd_ready && cmd_we) begin
+            write_state_next = WRWAIT;
+        end
+        else if (write_state == WRWAIT && wdata_valid && wdata_ready) begin
+            write_state_next = FINISHED;
+        end
         else if (write_state == FINISHED && state == IDLE) begin
             write_state_next = IDLE;
+        end
+    end
+
+    always @(*) begin
+        issue_state_next = issue_state;
+        if (issue_state == IDLE && state == ISSUE) begin
+            issue_state_next = SENDCMD; 
+        end
+        else if (issue_state == SENDCMD && ComputeDRAM_vld && ComputeDRAM_rdy) begin
+            issue_state_next = FINISHED;
+        end
+        else if (issue_state == FINISHED && state == IDLE) begin
+            issue_state_next = IDLE;
         end
     end
 
@@ -239,6 +303,14 @@ module LiteDRAM_test(
             wdata_we = 64'hffff_ffff_ffff_ffff;
             rdata_ready = 0;
         end
+        else if (state == WRITE && write_state == WRWAIT) begin
+            cmd_valid = 0;
+            cmd_we = 1;
+            cmd_addr = wr_addr;
+            wdata_valid = 1;
+            wdata_we = 64'hffff_ffff_ffff_ffff;
+            rdata_ready = 0;
+        end
     end
 
     // led display
@@ -257,13 +329,22 @@ module LiteDRAM_test(
             end
             READOUT: begin
                 led[0]   = (read_state == FINISHED) & (counter_state[0]);
-                led[3:1] = rd_addr[2:0];
+                led[3:1] = rd_addr[12:10];
                 led[7:4] = read_out_data;
             end
             WRITE: begin
                 led[1:0] = write_state;
-                led[4:2] = wr_addr[2:0];
+                led[4:2] = wr_addr[12:10];
                 led[7:5] = 3'b111;
+            end
+            SETTING: begin
+                led[3:0] = ComputeDRAM_T1;
+                led[7:4] = ComputeDRAM_T2;
+            end
+            ISSUE: begin
+                led[1:0] = issue_state;
+                led[2] = ComputeDRAM_rdy;
+                led[7:3] = 5'b11100;
             end
         endcase
     end
@@ -299,11 +380,13 @@ module LiteDRAM_test(
             state <= IDLE;
             read_state <= IDLE;
             write_state <= IDLE;
+            issue_state <= IDLE;
         end
         else begin
             state <= state_next;
             read_state <= read_state_next;
             write_state <= write_state_next;
+            issue_state <= issue_state_next;
         end
     end
 
@@ -317,42 +400,49 @@ module LiteDRAM_test(
     end
 
     litedram_core litedram_core_impl(
-	.serial_tx                (serial_tx),           
-	.serial_rx                (serial_rx),
-	.clk200_p                 (clk200_p),
-	.clk200_n                 (clk200_n),
-	.cpu_reset                (cpu_reset),
-	.pll_locked               (pll_locked),
-	.ddram_a                  (ddram_a),
-	.ddram_ba                 (ddram_ba),
-	.ddram_ras_n              (ddram_ras_n),
-	.ddram_cas_n              (ddram_cas_n),
-	.ddram_we_n               (ddram_we_n),
-	.ddram_cs_n               (ddram_cs_n),
-	.ddram_dm                 (ddram_dm),
-	.ddram_dq                 (ddram_dq),
-	.ddram_dqs_p              (ddram_dqs_p),
-	.ddram_dqs_n              (ddram_dqs_n),
-	.ddram_clk_p              (ddram_clk_p),
-	.ddram_clk_n              (ddram_clk_n),
-	.ddram_cke                (ddram_cke),
-	.ddram_odt                (ddram_odt),
-	.ddram_reset_n            (ddram_reset_n),
-	.init_done                (init_done),
-	.init_error               (init_error),
-	.user_clk                 (user_clk),
-	.user_rst                 (user_rst),
-	.user_port0_cmd_valid     (cmd_valid),
-	.user_port0_cmd_ready     (cmd_ready),
-	.user_port0_cmd_we        (cmd_we),
-	.user_port0_cmd_addr      (cmd_addr),
-	.user_port0_wdata_valid   (wdata_valid),
-	.user_port0_wdata_ready   (wdata_ready),
-	.user_port0_wdata_we      (wdata_we),
-	.user_port0_wdata_data    (wdata_data),
-	.user_port0_rdata_valid   (rdata_valid),
-	.user_port0_rdata_ready   (rdata_ready),
-	.user_port0_rdata_data    (rdata_data)
+	.serial_tx                          (serial_tx),           
+	.serial_rx                          (serial_rx),
+	.clk200_p                           (clk200_p),
+	.clk200_n                           (clk200_n),
+	.cpu_reset                          (cpu_reset),
+	.pll_locked                         (pll_locked),
+	.ddram_a                            (ddram_a),
+	.ddram_ba                           (ddram_ba),
+	.ddram_ras_n                        (ddram_ras_n),
+	.ddram_cas_n                        (ddram_cas_n),
+	.ddram_we_n                         (ddram_we_n),
+	.ddram_cs_n                         (ddram_cs_n),
+	.ddram_dm                           (ddram_dm),
+	.ddram_dq                           (ddram_dq),
+	.ddram_dqs_p                        (ddram_dqs_p),
+	.ddram_dqs_n                        (ddram_dqs_n),
+	.ddram_clk_p                        (ddram_clk_p),
+	.ddram_clk_n                        (ddram_clk_n),
+	.ddram_cke                          (ddram_cke),
+	.ddram_odt                          (ddram_odt),
+	.ddram_reset_n                      (ddram_reset_n),
+	.init_done                          (init_done),
+	.init_error                         (init_error),
+	.user_clk                           (user_clk),
+	.user_rst                           (user_rst),
+	.user_port_native_0_cmd_valid       (cmd_valid),
+	.user_port_native_0_cmd_ready       (cmd_ready),
+	.user_port_native_0_cmd_we          (cmd_we),
+	.user_port_native_0_cmd_addr        (cmd_addr),
+	.user_port_native_0_wdata_valid     (wdata_valid),
+	.user_port_native_0_wdata_ready     (wdata_ready),
+	.user_port_native_0_wdata_we        (wdata_we),
+	.user_port_native_0_wdata_data      (wdata_data),
+	.user_port_native_0_rdata_valid     (rdata_valid),
+	.user_port_native_0_rdata_ready     (rdata_ready),
+	.user_port_native_0_rdata_data      (rdata_data),
+
+	.ComputeDRAM_R1                     (ComputeDRAM_R1 ),
+	.ComputeDRAM_R2                     (ComputeDRAM_R2 ),
+	.ComputeDRAM_T1                     (ComputeDRAM_T1 ),
+	.ComputeDRAM_T2                     (ComputeDRAM_T2 ),
+	.ComputeDRAM_vld                    (ComputeDRAM_vld),
+	.ComputeDRAM_rdy                    (ComputeDRAM_rdy)
     );
 
 endmodule

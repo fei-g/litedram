@@ -27,12 +27,13 @@ from migen import *
 from migen.genlib.record import *
 from migen.fhdl.decorators import ClockDomainsRenamer
 
-from litedram.common import PhySettings
+from litedram.common import *
 from litedram.phy.dfi import *
 
 
 class S6HalfRateDDRPHY(Module):
     def __init__(self, pads, memtype, rd_bitslip, wr_bitslip, dqs_ddr_alignment):
+        pads        = PHYPadsCombiner(pads)
         if memtype not in ["DDR", "LPDDR", "DDR2", "DDR3"]:
             raise NotImplementedError("S6HalfRateDDRPHY only supports DDR, LPDDR, DDR2 and DDR3")
         addressbits = len(pads.a)
@@ -45,6 +46,7 @@ class S6HalfRateDDRPHY(Module):
         # PHY settings -----------------------------------------------------------------------------
         if memtype == "DDR3":
             self.settings = PhySettings(
+                phytype       = "S6HalfRateDDRPHY",
                 memtype       = "DDR3",
                 databits      = databits,
                 dfi_databits  = 2*databits,
@@ -61,6 +63,7 @@ class S6HalfRateDDRPHY(Module):
             )
         else:
             self.settings = PhySettings(
+                phytype       = "S6HalfRateDDRPHY",
                 memtype       = memtype,
                 databits      = databits,
                 dfi_databits  = 2*databits,
@@ -130,19 +133,23 @@ class S6HalfRateDDRPHY(Module):
                 r_dfi[n].we_n.eq(phase.we_n)
             ]
 
-        # output cmds
-        sd_sdram_half += [
-            pads.a.eq(r_dfi[phase_sel].address),
-            pads.ba.eq(r_dfi[phase_sel].bank),
-            pads.cke.eq(r_dfi[phase_sel].cke),
-            pads.ras_n.eq(r_dfi[phase_sel].ras_n),
-            pads.cas_n.eq(r_dfi[phase_sel].cas_n),
-            pads.we_n.eq(r_dfi[phase_sel].we_n)
-        ]
-        # optional pads
-        for name in "reset_n", "cs_n", "odt":
-          if hasattr(pads, name):
-              sd_sdram_half += getattr(pads, name).eq(getattr(r_dfi[phase_sel], name))
+        # Iterate on pads groups -------------------------------------------------------------------
+        for pads_group in range(len(pads.groups)):
+            pads.sel_group(pads_group)
+
+            # output cmds
+            sd_sdram_half += [
+                pads.a.eq(r_dfi[phase_sel].address),
+                pads.ba.eq(r_dfi[phase_sel].bank),
+                pads.cke.eq(r_dfi[phase_sel].cke),
+                pads.ras_n.eq(r_dfi[phase_sel].ras_n),
+                pads.cas_n.eq(r_dfi[phase_sel].cas_n),
+                pads.we_n.eq(r_dfi[phase_sel].we_n)
+            ]
+            # optional pads
+            for name in "reset_n", "cs_n", "odt":
+              if hasattr(pads, name):
+                  sd_sdram_half += getattr(pads, name).eq(getattr(r_dfi[phase_sel], name))
 
         # Bitslip ----------------------------------------------------------------------------------
         bitslip_cnt = Signal(4)
@@ -213,19 +220,17 @@ class S6HalfRateDDRPHY(Module):
 
             # DQS tristate buffer
             if hasattr(pads, "dqs_n"):
-                self.specials += Instance("OBUFTDS",
-                    i_I=dqs_o[i],
-                    i_T=dqs_t[i],
-
-                    o_O=pads.dqs[i],
-                    o_OB=pads.dqs_n[i],
+                self.specials += Instance("IOBUFDS",
+                    i_T    = dqs_t[i],
+                    i_I    = dqs_o[i],
+                    io_IO  = pads.dqs[i],
+                    io_IOB = pads.dqs_n[i],
                 )
             else:
-                self.specials += Instance("OBUFT",
-                    i_I=dqs_o[i],
-                    i_T=dqs_t[i],
-
-                    o_O=pads.dqs[i]
+                self.specials += Instance("IOBUF",
+                    i_T   = dqs_t[i],
+                    i_I   = dqs_o[i],
+                    io_IO = pads.dqs[i],
                 )
 
         sd_sdram_half += postamble.eq(drive_dqs)
@@ -406,6 +411,7 @@ class S6HalfRateDDRPHY(Module):
 
 class S6QuarterRateDDRPHY(Module):
     def __init__(self, pads, rd_bitslip, wr_bitslip, dqs_ddr_alignment):
+        pads        = PHYPadsCombiner(pads)
         addressbits = len(pads.a)
         bankbits = len(pads.ba)
         nranks = 1 if not hasattr(pads, "cs_n") else len(pads.cs_n)
@@ -420,6 +426,7 @@ class S6QuarterRateDDRPHY(Module):
 
         # PHY settings -----------------------------------------------------------------------------
         self.settings = PhySettings(
+            phytype       = "S6QuarterRateDDRPHY",
             memtype       = "DDR3",
             databits      = databits,
             dfi_databits  = 2*databits,
