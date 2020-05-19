@@ -41,6 +41,7 @@ from litex.boards.platforms import versa_ecp5
 
 from litex.boards.platforms import genesys2
 from litex.boards.platforms import vc707
+from litex_boards.platforms import vcu118
 
 from litex.soc.cores.clock import *
 from litex.soc.integration.soc_sdram import *
@@ -59,6 +60,7 @@ from litedram.frontend.wishbone import *
 from litedram.frontend.bist import LiteDRAMBISTGenerator
 from litedram.frontend.bist import LiteDRAMBISTChecker
 from litedram.frontend.fifo import LiteDRAMFIFO
+from litedram.common import PHYPadsReducer
 
 # IOs/Interfaces -----------------------------------------------------------------------------------
 
@@ -314,6 +316,35 @@ class LiteDRAMS7DDRPHYCRG(Module):
         # iodelay_pll.create_clkout(self.cd_iodelay, core_config["iodelay_clk_freq"])
         self.submodules.idelayctrl = S7IDELAYCTRL(self.cd_iodelay)
 
+class LiteDRAMUSDDRPHYCRG(Module):
+    def __init__(self, platform, core_config):
+        self.clock_domains.cd_sys     = ClockDomain()
+        self.clock_domains.cd_sys4x   = ClockDomain(reset_less=True)
+        self.clock_domains.cd_pll4x   = ClockDomain(reset_less=True)
+        self.clock_domains.cd_iodelay = ClockDomain()
+
+        # # #
+
+        self.submodules.pll = pll = USMMCM(speedgrade=-2)
+        self.comb += pll.reset.eq(platform.request("cpu_reset"))
+
+        # Assume input clk for US/USPDDRPHY is 125MHz
+        pll.register_clkin(platform.request("clk125"), core_config["input_clk_freq"])
+        pll.create_clkout(self.cd_pll4x, core_config["sys_clk_freq"]*4, buf=None, with_reset=False)
+        pll.create_clkout(self.cd_iodelay, core_config["iodelay_clk_freq"], with_reset=False)
+
+        self.specials += [
+            Instance("BUFGCE_DIV", name="main_bufgce_div",
+                p_BUFGCE_DIVIDE=4,
+                i_CE=1, i_I=self.cd_pll4x.clk, o_O=self.cd_sys.clk),
+            Instance("BUFGCE", name="main_bufgce",
+                i_CE=1, i_I=self.cd_pll4x.clk, o_O=self.cd_sys4x.clk),
+            AsyncResetSynchronizer(self.cd_iodelay, ~pll.locked),
+        ]
+
+        self.comb += platform.request("pll_locked").eq(pll.locked)
+        self.submodules.idelayctrl = USIDELAYCTRL(cd_ref=self.cd_iodelay, cd_sys=self.cd_sys)
+
 # LiteDRAMCoreControl ------------------------------------------------------------------------------
 
 class LiteDRAMCoreControl(Module, AutoCSR):
@@ -358,6 +389,8 @@ class LiteDRAMCore(SoCSDRAM):
             self.submodules.crg = crg = LiteDRAMECP5DDRPHYCRG(platform, core_config)
         if core_config["sdram_phy"] in [litedram_phys.A7DDRPHY, litedram_phys.K7DDRPHY, litedram_phys.V7DDRPHY]:
             self.submodules.crg = LiteDRAMS7DDRPHYCRG(platform, core_config)
+        if core_config["sdram_phy"] in [litedram_phys.USDDRPHY, litedram_phys.USPDDRPHY]:
+            self.submodules.crg = LiteDRAMUSDDRPHYCRG(platform, core_config)
 
         # DRAM -------------------------------------------------------------------------------------
         # platform.add_extension(get_dram_ios(core_config))
@@ -387,6 +420,20 @@ class LiteDRAMCore(SoCSDRAM):
                     rtt_nom = core_config["rtt_nom"],
                     rtt_wr  = core_config["rtt_wr"],
                     ron     = core_config["ron"])
+        # USDDRPHY
+        if core_config["sdram_phy"] in [litedram_phys.USDDRPHY, litedram_phys.USPDDRPHY]:
+            assert core_config["memtype"] in ["DDR3", "DDR4"]
+            ddram_pads = platform.request("ddram")
+            # TODO make it configurable
+            ddram_pads = PHYPadsReducer(ddram_pads, modules=[0, 1, 2, 3])
+            self.submodules.ddrphy = core_config["sdram_phy"](
+                pads             = ddram_pads,
+                memtype          = core_config["memtype"],
+                sys_clk_freq     = sys_clk_freq,
+                iodelay_clk_freq = core_config["iodelay_clk_freq"],
+                cmd_latency      = core_config["cmd_latency"])
+            self.add_constant("USDDRPHY_DEBUG")
+
         self.add_csr("ddrphy")
 
         sdram_module = core_config["sdram_module"](sys_clk_freq,
@@ -614,7 +661,7 @@ def main():
             core_config[k] = getattr(litedram_phys, core_config[k])
 
     # Generate core --------------------------------------------------------------------------------
-    platform = vc707.Platform()
+    platform = vcu118.Platform()
     '''
     if core_config["sdram_phy"] in [litedram_phys.ECP5DDRPHY]:
         platform = LatticePlatform("LFE5UM5G-45F-8BG381C", io=[], toolchain="trellis") # FIXME: allow other devices.
